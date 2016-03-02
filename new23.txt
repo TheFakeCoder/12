@@ -1,0 +1,850 @@
+
+
+
+--list controller
+
+angular.module('studentApp')
+.controller('studentListCtrl', ['$scope', '$state', 'studentFactory', '$stateParams', '$window', '$http', function ($scope, $state, studentFactory, $stateParams, $window, $http) {
+    //console.log('Reached in controller');
+
+    $scope.message = '';
+    $scope.student = {};
+
+    $scope.listStudent = function () {
+        studentFactory.listStudent().success(function (data) {
+            //            console.log(data.d);
+            $scope.studentinDb = JSON.parse(data.d);
+        })
+    };
+
+
+    $scope.listStudentfromLocal = function () {
+        return $scope.getLocalStorage();
+    };
+
+
+    // $scope.listStudent();
+
+
+
+    $scope.flag = true;
+    $scope.sort = function (column) {
+        $scope.flag = !$scope.flag;
+        $scope.orderByColumn = column;
+
+    }
+
+    $scope.editUpdate = function (id) {
+
+        $state.go('addStudent', { '_id': id });
+    }
+
+    $scope.editUpdateLocal = function (id, index) {
+
+        $window.localStorage['index'] = index;
+        $state.go('addStudent', { '_id': id });
+    }
+
+    $scope.deletefromLocal = function (id) {
+        $scope.studentList = [];
+        var stud = {};
+        var arr = $scope.listStudentfromLocal();
+
+        arr.splice(id, 1);
+        $scope.setLocalStorage(arr);
+        //        for (var i = 0; i < arr.length; i++) {
+        //            if (arr[i]._id == id) {
+        //                arr[i].splice();
+        //            }
+        //        }
+    }
+
+    $scope.deleteStudent = function (id) {
+        studentFactory.deleteStudentById(id).success(function (data) {
+            alert('Student data removed !!');
+            $scope.message = 'Student data removed !!';
+            $scope.listStudent();
+
+        }).error(function (data, status, headers, config, statusText, error) {
+            alert("In error : -->" + data.Message);
+            alert("Status : -->" + status);    // 400
+            console.log("Erroraaaa : -->" + data.Message);
+            /// deferred.reject(status);
+        });
+    }
+
+    $scope.studentList = [];
+    $scope.getLocalStorage = function () {
+        $scope.studentList = angular.fromJson($window.localStorage['student']);
+        return $scope.studentList;
+
+    }
+
+    $scope.studentList = angular.fromJson($window.localStorage['student']);
+
+    // $scope.listStudentfromLocal();
+
+    $scope.setLocalStorage = function (obj) {
+        obj._id = new Date().getTime().toString();
+        $scope.studentList.push(obj);
+        $window.localStorage['student'] = angular.toJson($scope.studentList);
+    }
+
+    $scope.syncToMongoDB = function () {
+
+        console.log(angular.toJson($scope.studentList));
+        studentFactory.syncData($scope.studentList).success(function (data) {
+
+            console.log("Done");
+            if (data.d == true) {
+                $scope.message = "Student data saved successfully!!!";
+
+                $state.go('listStudent');
+
+            }
+            else { $scope.message = "Student data not saved, plesase try after some time"; }
+
+        }).error(function (data, status, headers, config, statusText, error) {
+
+            alert(error);
+
+        });
+    }
+
+    $scope.syncToMongoDB1 = function () {
+
+        $http({
+            method: "POST",
+            url: "../studentService/student.asmx/syncData",
+            data: { "studentObj": angular.toJson($scope.studentList) }
+        })
+        .then(function mySucces(response) {
+
+            $scope.studentList = response.data;
+            localStorage.setItem("student", angular.toJson($scope.studentList));
+            alert("Data synched successfully !!!");
+        }, function myError(response) {
+            console.log(response.statusText);
+        });
+    }
+
+
+}
+]);
+
+
+--student controller
+
+angular.module('studentApp')
+.controller('studentCtrl', ['$scope', '$state', 'studentFactory', '$stateParams', '$window', function ($scope, $state, studentFactory, $stateParams, $window) {
+    console.log('Reached in controller');
+
+    $scope.countryList = countryList;
+    $scope.stateList = stateList;
+    $scope.districtList = districtList;
+
+    $scope.message = '';
+    $scope.student = {};
+
+    $scope._id = $stateParams._id;
+    //    console.log('data' + $scope._id);
+
+
+    $scope.studentList = [];
+    $scope.getLocalStorage = function () {
+        $scope.studentList = angular.fromJson($window.localStorage['student']);
+
+
+    }
+    $scope.listStudentfromLocal = function () {
+        $scope.getLocalStorage();
+    };
+
+    $scope.getListFromStorage = function () {
+        if ($scope._id != '' && $scope._id != undefined) {
+
+            // $scope.studentList = [];
+            var stud = {};
+            $scope.listStudentfromLocal();
+            var arr = $scope.studentList;
+            for (var i = 0; i < arr.length; i++) {
+                if (arr[i]._id == $scope._id) {
+                    stud = arr[i];
+                }
+            }
+            $scope.student = stud;
+            /*
+            studentFactory.getStudentById($scope._id).success(function (data) {
+            var stnObj = angular.fromJson(data.d)[0];
+            $scope.student = stnObj;
+            $scope.student.bday = new Date(stnObj.bday);
+            }).error(function (data, status, headers, config, statusText, error) {
+
+            });*/
+        }
+    }
+    $scope.getListFromStorage();
+
+
+
+    $scope.saveStudent = function (student) {
+      //  console.log(student);
+
+        if (student._id != null) {
+            studentFactory.editStudent(student).success(function (data) {
+                if (data.d == true) {
+                    $scope.setLocalStorage($scope.student);
+                    // $rootScope.showMessage = true;
+                    // $rootScope.message = "Student updated Successfully";
+                }
+                else {
+                    // $rootScope.showMessage = true;
+                    // $rootScope.message = "Student data not updated,Please contact to admin";
+                }
+                $scope.success = true;
+                $state.go('listStudent');
+            });
+        }
+        else {
+            // console.log('Reached in controller FUNCTION');
+            $scope.setLocalStorage($scope.student);
+
+            $state.go('listStudent');
+
+
+            /*           studentFactory.saveStudent(student).success(function (data) {
+
+            console.log("Done");
+            if (data.d == true) {
+            $scope.message = "Student data saved successfully!!!";
+
+            $state.go('listStudent');
+
+            }
+            else { $scope.message = "Student data not saved, plesase try after some time"; }
+
+            });
+            */
+        }
+    }
+    $scope.studentList = [];
+    $scope.setLocalStorage = function (obj) {
+
+        obj._id = new Date().getTime().toString();
+        $scope.studentList = ($window.localStorage['student'] !== null && $window.localStorage['student'] != undefined) ? JSON.parse($window.localStorage['student']) : [];
+        if ($window.localStorage['index'] !== null && $window.localStorage['index'] != undefined) {
+            $scope.studentList.splice(parseInt($window.localStorage['index']), 1, obj);
+            localStorage.removeItem('index');
+
+        }
+        else {
+            $scope.studentList.push(obj);
+        }
+        $window.localStorage['student'] = angular.toJson($scope.studentList);
+    }
+
+    // $scope.stud.dateOfBirth = new Date(stud.dateOfBirth);
+
+}
+
+//$scope.listStudent();
+
+
+]);
+
+
+---service
+
+angular.module('studentApp')
+.factory('studentFactory', ['$http', function ($http) {
+    var studentFactory = {};
+
+    studentFactory.saveStudent = function (student) {
+        //  console.log('Reached in FACTORY FUNCTION');
+
+        return $http(
+        {
+            url: '../studentService/student.asmx/saveStudent',
+            method: 'POST',
+            data: { studentObj: angular.toJson(student) }
+
+
+        });
+
+    }
+
+    studentFactory.listStudent = function () {
+        return $http(
+        {
+            url: '../studentService/student.asmx/getAllStudent',
+            method: 'GET',
+            data: {},
+            headers: { "Content-Type": "application/json" }
+        });
+
+    }
+
+    studentFactory.getStudentById = function (sid) {
+        return $http({
+            url: '../studentService/student.asmx/getStudentById',
+            method: "POST",
+            data: { sid: sid }
+            //headers: { "Content-Type": "application/json" }
+        })
+    };
+
+    studentFactory.deleteStudentById = function (sid) {
+        return $http({
+            url: '../studentService/student.asmx/deleteStudentById',
+            method: "POST",
+            data: { sid: sid }
+            //headers: { "Content-Type": "application/json" }
+        })
+    };
+
+    studentFactory.editStudent = function (student) {
+        return $http({
+            url: "../studentService/student.asmx/editStudent",
+            method: "POST",
+            data: { studentObj: angular.toJson(student) }
+        })
+    };
+
+    studentFactory.syncData = function (student) {
+        return $http({
+            url: "../studentService/student.asmx/syncData",
+            method: "POST",
+            data: { studentObj: angular.toJson(student) }
+        })
+    };
+
+    return studentFactory;
+}
+
+])
+
+--router
+
+angular.module('studentApp')
+.config(function ($stateProvider, $urlRouterProvider) {
+
+    $urlRouterProvider.otherwise('/addStudent');
+    $stateProvider
+        .state('addStudent', {
+            url: '/addStudent/:_id',
+            templateUrl: '../student/partials/addStudent.html',
+            controller: 'studentCtrl'
+
+        })
+        .state('listStudent', {
+            url: '/addStudent',
+            templateUrl: '../student/partials/listStudent.html',
+            controller: 'studentListCtrl'
+        });
+
+});
+
+
+--app js
+
+angular.module('studentApp', ['ui.router'])
+
+
+---add html
+
+<form class="form-horizontal" ng-submit="saveStudent(student)">
+<fieldset>
+</br>
+</br>
+</br>
+    <div class="form-group">
+        <label class="col-md-4 control-label">
+            First Name:</label>
+        <div class="col-md-6">
+            <input ng-model="student.firstName" type="text" placeholder="First Name" class="form-control input-md"
+                required>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-md-4 control-label">
+            Middle Name:</label>
+        <div class="col-md-6">
+            <input ng-model="student.middleName" type="text" placeholder="Middle Name" class="form-control input-md"
+                required>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-md-4 control-label">
+            Last Name:</label>
+        <div class="col-md-6">
+            <input ng-model="student.lastName" type="text" placeholder="Last Name" class="form-control input-md"
+                required>
+        </div>
+    </div>
+     <div class="form-group">
+        <div class="col-md-4 control-label">
+            <b>Birth date:</b></div>
+        <div class="col-md-4">
+            <input type="date" class="form-control" ng-model="student.bday">
+        </div>
+    </div>
+   <div class="form-group">
+        <div class="col-md-4 control-label">
+            <b>Gender:</b></div>
+        <div class="col-md-3">
+            <label class="radio-inline">
+                <input type="radio" name="gender" value="Male" ng-model="student.gender" required/>Male</label>
+            <label class="radio-inline">
+                <input type="radio" name="gender" value="Female" ng-model="student.gender" required/>Female</label>
+        </div>
+         <div class="form-group" ng-messages="exampleForm.gender.$error" ng-show="exampleForm.gender.$touched && exampleForm.gender.$invalid">
+            <p ng-message="required">This field is required </p>
+        </div>
+    </div>
+   
+    <div class="form-group">
+        <div class="col-md-4 control-label">
+            <b>Country:</b></div>
+        <div class="col-md-6">
+            <select name="ddlCountry" class="form-control" ng-model="student.address.country"
+                ng-options="country as country.Country_Description for country in countryList track by country.pk_Country_ID"
+                required>
+                <option value="">-----selected-----</option>
+            </select>
+        </div>
+        <div class="form-group" ng-messages="exampleForm.ddlCountry.$error" ng-show="exampleForm.ddlCountry.$touched && exampleForm.ddlCountry.$invalid">
+            <p ng-message="required">
+                This field is required
+            </p>
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-md-4 control-label">
+            <b>State:</b></div>
+        <div class="col-md-6">
+            <select class="form-control" ng-model="student.address.state" ng-disabled="!student.address.country"
+                ng-options="state as state.State_Name for state in stateList|filter:{Country_ID:student.address.country.pk_Country_ID}:true track by state.State_ID">
+                <option value="">------Select------</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-md-4 control-label">
+            <b>District:</b></div>
+        <div class="col-md-6">
+            <select class="form-control" ng-model="student.address.distirct" ng-disabled="!student.address.state"
+                ng-options="district as district.District_Name for district in districtList|filter:{State_ID:student.address.state.State_ID}:true |orderBy:'District_Name' track by district.District_ID">
+                <option value="">------Select------</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-md-4 control-label">
+            Address:</label>
+        <div class="col-md-4">
+            <textarea class="form-control" ng-model="student.address.line1" name="student.address.line1"></textarea>
+        </div>
+    </div>
+    <div class="form-group">
+        <label class="col-md-4 control-label" for="">
+        </label>
+        <div class="col-md-8">
+            <button id="" name="" class="btn btn-success" type="submit">
+                Save</button>
+            <button class="btn btn-danger">
+                Cancel</button>
+        </div>
+    </div>
+    </br>
+    </br>
+    </br>
+    </br>
+    </br>
+    </br>
+   <!-- {{student}}-->
+</fieldset>
+</form>
+
+
+-----------------list html
+
+<div>
+    <div class="page-header">
+        <h1>
+            List of Students</h1>
+    </div>
+    <div class="form-group">
+        <div ng-show="showMessage" class="alert alert-success">
+            {{message}}</div>
+        <div style="align: right">
+        </div>
+        <table class="table table-bordered table-hover" ng-show="studentinDb.length > 0">
+            <thead>
+                <tr>
+                    <th ng-click="sort('firstName');">
+                        <div class="form-group">
+                            <div class="col-md-10">
+                                <input type="text" ng-model="firstNameFilter" placeholder="First Name filter" class="form-control input-md" />
+                            </div>
+                        </div>
+                        </br> <b>First Name</b>
+                    </th>
+                    <th ng-click="sort('middleName');">
+                        <!--<div class="form-group">
+                            <div class="col-md-10">
+                                <input type="text" ng-model="middleNameFilter" placeholder="Middle Name filter" class="form-control input-md" />
+                            </div>
+                        </div>-->
+                        </br> <b>Middle Name</b>
+                    </th>
+                    <th ng-click="sort('lastName');">
+                        <!--  <div class="form-group">
+                            <div class="col-md-10">
+                                <input type="text" ng-model="lastNameFilter" placeholder="Last Name filter" class="form-control input-md" />
+                            </div>
+                        </div>
+                        </br>-->
+                        <b>Last Name</b>
+                    </th>
+                    <th>
+                        <!--<div class="form-group">
+                            <div class="col-md-10">
+                                <input type="text" ng-model="genderFilter" placeholder="Gender filter" class="form-control input-md" />
+                            </div>
+                        </div>
+                        </br>-->
+                        <b>Gender</b>
+                    </th>
+                    <th>
+                        <!--<div class="form-group">
+                            <div class="col-md-10">
+                                <input type="text" ng-model="dobFilter" placeholder="Date of Birth filter" class="form-control input-md" />
+                            </div>
+                        </div>
+                        </br>-->
+                        <b>Date of Birth</b>
+                    </th>
+                    <th>
+                        <b>Action</b>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr ng-repeat="stud in studentinDb | filter: firstNameFilter  | orderBy:orderByColumn : flag">
+                    <td>
+                        {{stud.firstName}}
+                    </td>
+                    <td>
+                        {{stud.middleName}}
+                    </td>
+                    <td>
+                        {{stud.lastName}}
+                    </td>
+                    <td>
+                        {{stud.gender}}
+                    </td>
+                    <td>
+                        {{stud.bday | date: 'dd/MM/yyyy'}}
+                    </td>
+                    <td>
+                        <a ng-click="editUpdate(stud._id.$oid)">Edit</a> | <a ng-click="deleteStudent(stud._id.$oid)">
+                            Delete</a>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <table class="table table-bordered table-hover" ng-show="studentList.length > 0">
+            <thead>
+                <tr>
+                    <th>
+                        <div class="form-group">
+                            <div class="col-md-10">
+                                <input type="text" ng-model="firstNameFilter" placeholder="First Name filter" class="form-control input-md" />
+                            </div>
+                        </div>
+                        </br> <b>First Name</b>
+                    </th>
+                    <th >
+                        <!--<div class="form-group">
+                            <div class="col-md-10">
+                                <input type="text" ng-model="middleNameFilter" placeholder="Middle Name filter" class="form-control input-md" />
+                            </div>
+                        </div>-->
+                        </br> <b>Middle Name</b>
+                    </th>
+                    <th >
+                        <!--  <div class="form-group">
+                            <div class="col-md-10">
+                                <input type="text" ng-model="lastNameFilter" placeholder="Last Name filter" class="form-control input-md" />
+                            </div>
+                        </div>
+                        </br>-->
+                        <b>Last Name</b>
+                    </th>
+                    <th>
+                        <!--<div class="form-group">
+                            <div class="col-md-10">
+                                <input type="text" ng-model="genderFilter" placeholder="Gender filter" class="form-control input-md" />
+                            </div>
+                        </div>
+                        </br>-->
+                        <b>Gender</b>
+                    </th>
+                    <th>
+                        <!--<div class="form-group">
+                            <div class="col-md-10">
+                                <input type="text" ng-model="dobFilter" placeholder="Date of Birth filter" class="form-control input-md" />
+                            </div>
+                        </div>
+                        </br>-->
+                        <b>Date of Birth</b>
+                    </th>
+                    <th>
+                        <b>Action</b>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr ng-repeat="stud in studentList">
+                    <td>
+                        {{stud.firstName}}
+                    </td>
+                    <td>
+                        {{stud.middleName}}
+                    </td>
+                    <td>
+                        {{stud.lastName}}
+                    </td>
+                    <td>
+                        {{stud.gender}}
+                    </td>
+                    <td>
+                        {{stud.bday | date: 'dd/MM/yyyy'}}
+                    </td>
+                    <td>
+                        <a ng-click="editUpdateLocal(stud._id,$index)">Edit</a> | <a ng-click="deletefromLocal($index)">
+                            Delete</a>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="form-group">
+            <label class="col-md-4 control-label" for="">
+            </label>
+            <div class="col-md-8">
+                <button id="" name="" class="btn btn-success" ng-click="syncToMongoDB();">
+                    Sync to cloud</button>
+            </div>
+        </div>
+
+       <!-- {{studentList}}-->
+        <br />
+        <br />
+        <br />
+        <br />
+        <br />
+        <br />
+        <br />
+    </div>
+</div>
+
+
+------------------asmx
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Web;
+using System.Web.Services;
+using DemoProject_Template_DU.DbUtilityDB;
+using System.Web.Script.Services;
+using MongoDB.Bson;
+using MongoDB.Driver;
+using MongoDB.Bson.Serialization;
+using System.Configuration;
+
+namespace AngularExam.studentService
+{
+    /// <summary>
+    /// Summary description for student
+    /// </summary>
+    [WebService(Namespace = "http://tempuri.org/")]
+    [WebServiceBinding(ConformsTo = WsiProfiles.BasicProfile1_1)]
+    [System.ComponentModel.ToolboxItem(false)]
+    // To allow this Web Service to be called from script, using ASP.NET AJAX, uncomment the following line. 
+    [System.Web.Script.Services.ScriptService]
+    public class student : System.Web.Services.WebService
+    {
+        #region Private Variables
+        static DbUtility oDAL = new DbUtility();
+        static string sResult = string.Empty;
+        #endregion
+
+        [WebMethod]
+        public bool saveStudent(string studentObj)
+        {
+            return oDAL.SaveDocument(studentObj, "student");
+
+        }
+
+        [WebMethod]
+        [ScriptMethod(UseHttpGet = true)]
+        public string getAllStudent()
+        {
+            return oDAL.GetAllDocumentsWithObjectId("student");
+        }
+
+        [WebMethod]
+        public string getStudentById(string sid)
+        {
+            return oDAL.GetDocumentByIdWithObjectId("student", "_id", ObjectId.Parse(sid));
+        }
+
+        [WebMethod]
+        public bool deleteStudentById(string sid)
+        {
+            return oDAL.DeleteDocumentByObjectId("student",  ObjectId.Parse(sid));
+        }
+
+        [WebMethod]
+        public bool editStudent(string studentObj)
+        {
+            return oDAL.UpdateDocumentByObjectId(studentObj, "student");
+
+        }
+
+        [WebMethod]
+        public void syncData(string studentObj)
+        {
+            var client = new MongoClient(Convert.ToString(ConfigurationManager.AppSettings["MongoDBServer"]));
+            var server = client.GetServer();
+            var database = server.GetDatabase(Convert.ToString(ConfigurationManager.AppSettings["DBName"]));
+            var collection = database.GetCollection<BsonArray>("student");
+
+            collection.RemoveAll();
+            var netxMessageBatch = BsonSerializer.Deserialize<BsonArray>(studentObj);
+            collection.InsertBatch(netxMessageBatch);
+
+
+            //var collection1 = database.GetCollection<BsonDocument>("Account");
+            //MongoCursor<BsonDocument> cursor = collection1.FindAll();
+            //List<BsonDocument> entities = cursor.ToList();
+            //JavaScriptSerializer Json = new JavaScriptSerializer();
+            //string returnDocs = Json.Serialize(entities);
+        }
+
+        [WebMethod]
+        public string SynchData1(string studentObj)
+        {
+            string strInsertList;
+            List<Dictionary<string, object>> todos = Newtonsoft.Json.JsonConvert.DeserializeObject<List<Dictionary<string, object>>>(studentObj);
+            List<Dictionary<string, object>> insertList = new List<Dictionary<string, object>>();
+            List<Dictionary<string, object>> updateList = new List<Dictionary<string, object>>();
+            foreach (Dictionary<string, object> t1 in todos)
+            {
+                if (t1.Keys.Contains("_id"))
+                {
+                    new DbUtility().ReplaceDocumentByObjectId(Newtonsoft.Json.JsonConvert.SerializeObject(t1), "student");
+                }
+                else
+                {
+                    insertList.Add(t1);
+                }
+            }
+
+            if (insertList.Count > 0)
+            {
+                strInsertList = Newtonsoft.Json.JsonConvert.SerializeObject(insertList);
+                new DbUtility().SaveDocuments(strInsertList, "student");
+            }
+
+            var toDos = new DbUtility().GetAllDocumentsWithObjectId("student");
+
+            return toDos;
+        }
+    }
+}
+------index html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="icon" href="../../favicon.ico">
+    <title>Student Application</title>
+    <!-- Bootstrap core CSS -->
+    <link href="Styles/bootstrap.min.css" rel="stylesheet" type="text/css" />
+    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+    <link href="Styles/ie10-viewport-bug-workaround.css" rel="stylesheet" type="text/css" />
+    <!-- Custom styles for this template -->
+    <link href="Styles/cover.css" rel="stylesheet" type="text/css" />
+    <!-- Just for debugging purposes. Don't actually copy these 2 lines! -->
+    <!--[if lt IE 9]><script src="../../assets/js/ie8-responsive-file-warning.js"></script><![endif]-->
+    <script src="Scripts/ie-emulation-modes-warning.js" type="text/javascript"></script>
+    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+</head>
+<body ng-app='studentApp'>
+    <div class="site-wrapper">
+        <div class="site-wrapper-inner">
+            <div class="cover-container">
+                <div class="masthead clearfix">
+                    <div class="inner">
+                        <h3 class="masthead-brand">
+                            Student Application</h3>
+                        <nav>
+                <ul class="nav masthead-nav">
+                  <!--<li class="active"><a href="#">Home</a></li>-->
+                           <li  ui-sref-active="active"><a ui-sref="home">Home</a></li>
+                           <li  ui-sref-active="active"><a ui-sref="addStudent">Add Student</a></li>
+                           <li  ui-sref-active="active"><a ui-sref="listStudent">List Student</a></li>
+                 
+                </ul>
+              </nav>
+                    </div>
+                </div>
+                <div class="inner cover">
+                    <div>
+                        <!-- THIS IS WHERE WE WILL INJECT OUR CONTENT ============================== -->
+                        <div ui-view>
+                        </div>
+                    </div>
+                </div>
+                <div class="mastfoot">
+                    <div class="inner">
+                        <p>
+                            By MKCL
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="Scripts/jquery.min.js" type="text/javascript"></script>
+    <script>        window.jQuery || document.write('<script src="../../assets/js/vendor/jquery.min.js"><\/script>')</script>
+    <script src="Scripts/bootstrap.min.js" type="text/javascript"></script>
+    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+    <script src="Scripts/ie10-viewport-bug-workaround.js" type="text/javascript"></script>
+    <script src="Scripts/angular.min.js" type="text/javascript"></script>
+    <script src="Scripts/ui-router.js" type="text/javascript"></script>
+    <script src="student/js/student-app.js" type="text/javascript"></script>
+    <!--    <script src="student/js/controller/studentController.js" type="text/javascript"></script>-->
+    <script src="student/student-app-route.js" type="text/javascript"></script>
+    <script src="JSON/Country.js" type="text/javascript"></script>
+    <script src="JSON/districtList.js" type="text/javascript"></script>
+    <script src="JSON/State.js" type="text/javascript"></script>
+    <script src="student/js/controller/studentController.js" type="text/javascript"></script>
+    <script src="student/js/controller/studentListController.js" type="text/javascript"></script>
+    <script src="student/js/services/studentService.js" type="text/javascript"></script>
+</body>
+</html>
